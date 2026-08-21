@@ -48,8 +48,29 @@ def new_game():
 
 @app.route('/check', methods=['POST'])
 def check_solution():
-    data = request.json
-    board = data.get('board')
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or 'board' not in data:
+        return jsonify({'error': 'board is required'}), 400
+
+    board = data['board']
+    if (
+        not isinstance(board, list)
+        or len(board) != sudoku_logic.SIZE
+        or any(
+            not isinstance(row, list) or len(row) != sudoku_logic.SIZE
+            for row in board
+        )
+        or any(
+            isinstance(cell, bool)
+            or not isinstance(cell, int)
+            or cell < sudoku_logic.EMPTY
+            or cell > sudoku_logic.SIZE
+            for row in board
+            for cell in row
+        )
+    ):
+        return jsonify({'error': 'board must be a 9x9 grid of values from 0 to 9'}), 400
+
     solution = CURRENT.get('solution')
     if solution is None:
         return jsonify({'error': 'No game in progress'}), 400

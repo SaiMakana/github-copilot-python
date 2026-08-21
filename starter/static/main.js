@@ -2,6 +2,66 @@
 const SIZE = 9;
 let puzzle = [];
 
+function readBoard() {
+  const inputs = document.getElementById('sudoku-board').getElementsByTagName('input');
+  const board = [];
+  for (let i = 0; i < SIZE; i++) {
+    board[i] = [];
+    for (let j = 0; j < SIZE; j++) {
+      const value = inputs[i * SIZE + j].value;
+      board[i][j] = value ? parseInt(value, 10) : 0;
+    }
+  }
+  return board;
+}
+
+function hasConflict(board, row, col) {
+  const value = board[row][col];
+  if (value === 0) return false;
+
+  for (let index = 0; index < SIZE; index++) {
+    if (index !== col && board[row][index] === value) return true;
+    if (index !== row && board[index][col] === value) return true;
+  }
+
+  const startRow = row - row % 3;
+  const startCol = col - col % 3;
+  for (let boxRow = startRow; boxRow < startRow + 3; boxRow++) {
+    for (let boxCol = startCol; boxCol < startCol + 3; boxCol++) {
+      if ((boxRow !== row || boxCol !== col) && board[boxRow][boxCol] === value) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function updateInvalidCells() {
+  const board = readBoard();
+  const inputs = document.getElementById('sudoku-board').getElementsByTagName('input');
+  let hasInvalidCells = false;
+
+  for (let row = 0; row < SIZE; row++) {
+    for (let col = 0; col < SIZE; col++) {
+      const input = inputs[row * SIZE + col];
+      if (input.disabled) continue;
+      input.classList.remove('incorrect');
+      if (hasConflict(board, row, col)) {
+        input.classList.add('incorrect');
+        hasInvalidCells = true;
+      }
+    }
+  }
+
+  const msg = document.getElementById('message');
+  if (hasInvalidCells) {
+    msg.style.color = '#d32f2f';
+    msg.innerText = 'Invalid move';
+  } else if (msg.innerText === 'Invalid move') {
+    msg.innerText = '';
+  }
+}
+
 function createBoardElement() {
   const boardDiv = document.getElementById('sudoku-board');
   boardDiv.innerHTML = '';
@@ -18,6 +78,7 @@ function createBoardElement() {
       input.addEventListener('input', (e) => {
         const val = e.target.value.replace(/[^1-9]/g, '');
         e.target.value = val;
+        updateInvalidCells();
       });
       rowDiv.appendChild(input);
     }
@@ -62,15 +123,7 @@ async function newGame() {
 async function checkSolution() {
   const boardDiv = document.getElementById('sudoku-board');
   const inputs = boardDiv.getElementsByTagName('input');
-  const board = [];
-  for (let i = 0; i < SIZE; i++) {
-    board[i] = [];
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
-      const val = inputs[idx].value;
-      board[i][j] = val ? parseInt(val, 10) : 0;
-    }
-  }
+  const board = readBoard();
   const res = await fetch('/check', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},

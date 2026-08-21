@@ -141,6 +141,29 @@ def test_check_marks_incorrect_cells(client):
     assert response.get_json() == {'incorrect': [[0, 0]]}
 
 
+def test_check_marks_multiple_incorrect_cells(client):
+    client.get('/new?clues=81')
+    board = sudoku_logic.deep_copy(app.CURRENT['solution'])
+    board[0][0] = 1 if board[0][0] != 1 else 2
+    board[1][1] = 1 if board[1][1] != 1 else 2
+
+    response = client.post('/check', json={'board': board})
+
+    assert response.status_code == 200
+    assert response.get_json() == {'incorrect': [[0, 0], [1, 1]]}
+
+
+def test_check_marks_incomplete_board(client):
+    client.get('/new?clues=81')
+    board = sudoku_logic.deep_copy(app.CURRENT['solution'])
+    board[0][0] = sudoku_logic.EMPTY
+
+    response = client.post('/check', json={'board': board})
+
+    assert response.status_code == 200
+    assert response.get_json() == {'incorrect': [[0, 0]]}
+
+
 def test_check_accepts_current_solution(client):
     client.get('/new?clues=81')
 
@@ -148,3 +171,36 @@ def test_check_accepts_current_solution(client):
 
     assert response.status_code == 200
     assert response.get_json() == {'incorrect': []}
+
+
+def test_check_rejects_missing_board(client):
+    client.get('/new?clues=81')
+
+    response = client.post('/check', json={})
+
+    assert response.status_code == 400
+    assert response.get_json() == {'error': 'board is required'}
+
+
+def test_check_rejects_malformed_board(client):
+    client.get('/new?clues=81')
+
+    response = client.post('/check', json={'board': [[0]]})
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        'error': 'board must be a 9x9 grid of values from 0 to 9'
+    }
+
+
+def test_check_rejects_invalid_cell_values(client):
+    client.get('/new?clues=81')
+    board = sudoku_logic.create_empty_board()
+    board[0][0] = 10
+
+    response = client.post('/check', json={'board': board})
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        'error': 'board must be a 9x9 grid of values from 0 to 9'
+    }
