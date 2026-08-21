@@ -15,6 +15,24 @@ CURRENT = {
     'solution': None
 }
 
+
+def is_valid_board(board):
+    return (
+        isinstance(board, list)
+        and len(board) == sudoku_logic.SIZE
+        and all(
+            isinstance(row, list) and len(row) == sudoku_logic.SIZE
+            for row in board
+        )
+        and all(
+            not isinstance(cell, bool)
+            and isinstance(cell, int)
+            and sudoku_logic.EMPTY <= cell <= sudoku_logic.SIZE
+            for row in board
+            for cell in row
+        )
+    )
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -53,22 +71,7 @@ def check_solution():
         return jsonify({'error': 'board is required'}), 400
 
     board = data['board']
-    if (
-        not isinstance(board, list)
-        or len(board) != sudoku_logic.SIZE
-        or any(
-            not isinstance(row, list) or len(row) != sudoku_logic.SIZE
-            for row in board
-        )
-        or any(
-            isinstance(cell, bool)
-            or not isinstance(cell, int)
-            or cell < sudoku_logic.EMPTY
-            or cell > sudoku_logic.SIZE
-            for row in board
-            for cell in row
-        )
-    ):
+    if not is_valid_board(board):
         return jsonify({'error': 'board must be a 9x9 grid of values from 0 to 9'}), 400
 
     solution = CURRENT.get('solution')
@@ -80,6 +83,33 @@ def check_solution():
             if board[i][j] != solution[i][j]:
                 incorrect.append([i, j])
     return jsonify({'incorrect': incorrect})
+
+
+@app.route('/hint', methods=['POST'])
+def provide_hint():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or 'board' not in data:
+        return jsonify({'error': 'board is required'}), 400
+
+    board = data['board']
+    if not is_valid_board(board):
+        return jsonify({'error': 'board must be a 9x9 grid of values from 0 to 9'}), 400
+
+    puzzle = CURRENT.get('puzzle')
+    solution = CURRENT.get('solution')
+    if puzzle is None or solution is None:
+        return jsonify({'error': 'No game in progress'}), 400
+
+    for row in range(sudoku_logic.SIZE):
+        for col in range(sudoku_logic.SIZE):
+            if puzzle[row][col] == sudoku_logic.EMPTY and board[row][col] == sudoku_logic.EMPTY:
+                return jsonify({
+                    'row': row,
+                    'col': col,
+                    'value': solution[row][col],
+                })
+
+    return jsonify({'hint': None, 'message': 'No empty cells left'})
 
 if __name__ == '__main__':
     app.run(debug=True)

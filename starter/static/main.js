@@ -154,9 +154,40 @@ async function checkSolution() {
   }
 }
 
+async function requestHint() {
+  const res = await fetch('/hint', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({board: readBoard()})
+  });
+  const data = await res.json();
+  const msg = document.getElementById('message');
+  if (data.error) {
+    msg.style.color = '#d32f2f';
+    msg.innerText = data.error;
+    return;
+  }
+  if (data.hint === null) {
+    msg.style.color = '#388e3c';
+    msg.innerText = data.message;
+    return;
+  }
+
+  const input = document.querySelector(
+    `input[data-row="${data.row}"][data-col="${data.col}"]`
+  );
+  if (!input || input.disabled) return;
+  input.value = data.value;
+  input.disabled = true;
+  input.classList.remove('incorrect');
+  input.classList.add('hinted');
+  updateInvalidCells();
+}
+
 // Wire buttons
 window.addEventListener('load', () => {
   document.getElementById('new-game').addEventListener('click', newGame);
+  document.getElementById('hint').addEventListener('click', requestHint);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
   // initialize
   newGame();

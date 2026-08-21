@@ -48,6 +48,12 @@ h1 {
     background: #ffcdd2;
 }
 
+.sudoku-cell.hinted {
+    background: #fff3cd;
+    color: #856404;
+    font-weight: bold;
+}
+
 .sudoku-cell:nth-child(3),
 .sudoku-cell:nth-child(6) {
     border-right: 3px solid #333;

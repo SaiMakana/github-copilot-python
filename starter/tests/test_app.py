@@ -204,3 +204,98 @@ def test_check_rejects_invalid_cell_values(client):
     assert response.get_json() == {
         'error': 'board must be a 9x9 grid of values from 0 to 9'
     }
+
+
+def test_hint_requires_active_game(client):
+    response = client.post('/hint', json={'board': sudoku_logic.create_empty_board()})
+
+    assert response.status_code == 400
+    assert response.get_json() == {'error': 'No game in progress'}
+
+
+def test_hint_returns_one_empty_cell_and_correct_value(client):
+    client.get('/new?clues=40')
+    board = sudoku_logic.deep_copy(app.CURRENT['puzzle'])
+
+    response = client.post('/hint', json={'board': board})
+
+    assert response.status_code == 200
+    hint = response.get_json()
+    assert set(hint) == {'row', 'col', 'value'}
+    assert app.CURRENT['puzzle'][hint['row']][hint['col']] == sudoku_logic.EMPTY
+    assert hint['value'] == app.CURRENT['solution'][hint['row']][hint['col']]
+
+
+def test_hint_does_not_return_prefilled_cell(client):
+    client.get('/new?clues=40')
+    board = sudoku_logic.deep_copy(app.CURRENT['puzzle'])
+
+    response = client.post('/hint', json={'board': board})
+    hint = response.get_json()
+
+    assert app.CURRENT['puzzle'][hint['row']][hint['col']] == sudoku_logic.EMPTY
+
+
+def test_hint_does_not_overwrite_player_filled_cell(client):
+    client.get('/new?clues=40')
+    board = sudoku_logic.deep_copy(app.CURRENT['puzzle'])
+    first_empty = next(
+        (row, col)
+        for row in range(sudoku_logic.SIZE)
+        for col in range(sudoku_logic.SIZE)
+        if board[row][col] == sudoku_logic.EMPTY
+    )
+    board[first_empty[0]][first_empty[1]] = app.CURRENT['solution'][first_empty[0]][first_empty[1]]
+
+    response = client.post('/hint', json={'board': board})
+    hint = response.get_json()
+
+    assert (hint['row'], hint['col']) != first_empty
+
+
+def test_repeated_hints_return_different_cells(client):
+    client.get('/new?clues=40')
+    board = sudoku_logic.deep_copy(app.CURRENT['puzzle'])
+
+    first_response = client.post('/hint', json={'board': board})
+    first_hint = first_response.get_json()
+    board[first_hint['row']][first_hint['col']] = first_hint['value']
+
+    second_response = client.post('/hint', json={'board': board})
+    second_hint = second_response.get_json()
+
+    assert (first_hint['row'], first_hint['col']) != (
+        second_hint['row'], second_hint['col']
+    )
+
+
+def test_hint_reports_when_no_empty_cells_remain(client):
+    client.get('/new?clues=81')
+
+    response = client.post('/hint', json={'board': app.CURRENT['solution']})
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        'hint': None,
+        'message': 'No empty cells left',
+    }
+
+
+def test_hint_rejects_missing_board(client):
+    client.get('/new?clues=81')
+
+    response = client.post('/hint', json={})
+
+    assert response.status_code == 400
+    assert response.get_json() == {'error': 'board is required'}
+
+
+def test_hint_rejects_malformed_board(client):
+    client.get('/new?clues=81')
+
+    response = client.post('/hint', json={'board': [[0]]})
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        'error': 'board must be a 9x9 grid of values from 0 to 9'
+    }
