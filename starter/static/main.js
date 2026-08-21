@@ -1,8 +1,112 @@
 // Client-side rendering and interaction for the Flask-backed Sudoku
 const SIZE = 9;
+const SCORES_STORAGE_KEY = 'sudokuTop10Scores';
+const THEME_STORAGE_KEY = 'sudokuTheme';
 let puzzle = [];
 let timerId = null;
 let elapsedSeconds = 0;
+let scoreRecorded = false;
+
+function applyTheme(theme) {
+  const selectedTheme = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = selectedTheme;
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) {
+    const darkMode = selectedTheme === 'dark';
+    toggle.setAttribute('aria-pressed', String(darkMode));
+    toggle.textContent = darkMode ? 'Light mode' : 'Dark mode';
+  }
+}
+
+function loadTheme() {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) || 'light';
+  } catch (error) {
+    return 'light';
+  }
+}
+
+function toggleTheme() {
+  const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  applyTheme(nextTheme);
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  } catch (error) {
+    // Continue with the selected theme when browser storage is unavailable.
+  }
+}
+
+function validateScore(score) {
+  return score !== null
+    && typeof score === 'object'
+    && typeof score.name === 'string'
+    && score.name.trim() !== ''
+    && Number.isInteger(score.time)
+    && score.time >= 0
+    && ['easy', 'medium', 'hard'].includes(score.difficulty)
+    && Number.isFinite(score.createdAt);
+}
+
+function loadScores() {
+  try {
+    const storedScores = localStorage.getItem(SCORES_STORAGE_KEY);
+    if (!storedScores) return [];
+
+    const scores = JSON.parse(storedScores);
+    return Array.isArray(scores) ? scores.filter(validateScore) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveScores(scores) {
+  try {
+    localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(scores));
+  } catch (error) {
+    // Continue playing when browser storage is unavailable or full.
+  }
+}
+
+function renderScores() {
+  const scoreList = document.getElementById('score-list');
+  if (!scoreList) return;
+
+  scoreList.replaceChildren();
+  loadScores().forEach((score) => {
+    const item = document.createElement('li');
+    const name = document.createElement('span');
+    const time = document.createElement('span');
+    const difficulty = document.createElement('span');
+
+    name.className = 'score-name';
+    time.className = 'score-time';
+    difficulty.className = 'score-difficulty';
+    name.textContent = score.name;
+    time.textContent = formatElapsedTime(score.time);
+    difficulty.textContent = score.difficulty;
+
+    item.append(name, time, difficulty);
+    scoreList.appendChild(item);
+  });
+}
+
+function recordCompletedGame() {
+  const enteredName = window.prompt('Enter your name for the Top 10:', 'Player');
+  if (enteredName === null) return;
+
+  const name = enteredName.trim().slice(0, 30) || 'Player';
+  const scores = loadScores();
+  scores.push({
+    name,
+    time: elapsedSeconds,
+    difficulty: document.getElementById('difficulty').value,
+    createdAt: Date.now(),
+  });
+  scores.sort((left, right) => left.time - right.time || left.createdAt - right.createdAt);
+  const topScores = scores.slice(0, 10);
+  saveScores(topScores);
+  renderScores();
+}
 
 function formatElapsedTime(seconds) {
   const minutes = Math.floor(seconds / 60);
@@ -138,6 +242,7 @@ function renderPuzzle(puz) {
 async function newGame() {
   stopTimer();
   elapsedSeconds = 0;
+  scoreRecorded = false;
   updateTimerDisplay();
   const difficulty = document.getElementById('difficulty').value;
   const res = await fetch(`/new?difficulty=${encodeURIComponent(difficulty)}`);
@@ -178,6 +283,10 @@ async function checkSolution() {
   }
   if (incorrect.size === 0) {
     stopTimer();
+    if (!scoreRecorded) {
+      scoreRecorded = true;
+      recordCompletedGame();
+    }
     msg.style.color = '#388e3c';
     msg.innerText = 'Congratulations! You solved it!';
   } else {
@@ -218,9 +327,12 @@ async function requestHint() {
 
 // Wire buttons
 window.addEventListener('load', () => {
+  applyTheme(loadTheme());
+  renderScores();
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('hint').addEventListener('click', requestHint);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   // initialize
   newGame();
 });
