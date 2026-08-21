@@ -24,6 +24,41 @@ def is_safe(board, row, col, num):
                 return False
     return True
 
+def count_solutions(board, limit=2):
+    if limit <= 0:
+        return 0
+
+    working_board = deep_copy(board)
+    for row in range(SIZE):
+        for col in range(SIZE):
+            value = working_board[row][col]
+            if value == EMPTY:
+                continue
+            if value < 1 or value > SIZE:
+                return 0
+            working_board[row][col] = EMPTY
+            if not is_safe(working_board, row, col, value):
+                return 0
+            working_board[row][col] = value
+
+    def count_from_current_board():
+        for row in range(SIZE):
+            for col in range(SIZE):
+                if working_board[row][col] != EMPTY:
+                    continue
+                solutions = 0
+                for candidate in range(1, SIZE + 1):
+                    if is_safe(working_board, row, col, candidate):
+                        working_board[row][col] = candidate
+                        solutions += count_from_current_board()
+                        working_board[row][col] = EMPTY
+                        if solutions >= limit:
+                            return limit
+                return solutions
+        return 1
+
+    return count_from_current_board()
+
 def fill_board(board):
     for row in range(SIZE):
         for col in range(SIZE):
@@ -40,15 +75,26 @@ def fill_board(board):
     return True
 
 def remove_cells(board, clues):
-    attempts = SIZE * SIZE - clues
-    while attempts > 0:
-        row = random.randrange(SIZE)
-        col = random.randrange(SIZE)
-        if board[row][col] != EMPTY:
-            board[row][col] = EMPTY
-            attempts -= 1
+    coordinates = [(row, col) for row in range(SIZE) for col in range(SIZE)]
+    random.shuffle(coordinates)
+    filled_cells = SIZE * SIZE
+
+    for row, col in coordinates:
+        if filled_cells <= clues:
+            break
+        value = board[row][col]
+        board[row][col] = EMPTY
+        if count_solutions(board) == 1:
+            filled_cells -= 1
+        else:
+            board[row][col] = value
 
 def generate_puzzle(clues=35):
+    if isinstance(clues, bool) or not isinstance(clues, int):
+        raise TypeError('clues must be an integer')
+    if clues < 0 or clues > SIZE * SIZE:
+        raise ValueError(f'clues must be between 0 and {SIZE * SIZE}')
+
     board = create_empty_board()
     fill_board(board)
     solution = deep_copy(board)
