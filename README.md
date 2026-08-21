@@ -42,6 +42,17 @@ python app.py
 
 7. Open http://127.0.0.1:5000 in your browser.
 
+### Running Tests
+
+From the `starter` directory, install the dependencies and run the baseline test suite:
+
+```bash
+pip install -r requirements.txt
+python -m pytest
+```
+
+The tests use Flask's built-in test client and cover the existing routes and Sudoku logic without starting the development server.
+
 ## Project Instructions
 
 Use GitHub Copilot to refactor the code for this game to add more advanced features. The goal is to create a more modern and maintainable codebase and add additional functionality to the final product. You can use any combination of code completion and chat features, like Ask, Edit, or Agent modes.
